@@ -42,6 +42,8 @@ volatile int indexx = 0;
 double u_max = 1;  
 double u_min = -1; 
 
+double t_time = 0;
+
 
 void setup() {
   Serial.begin(115200);
@@ -58,11 +60,16 @@ void setup() {
 }
 
 void loop() {
+  t_time = 0;
+  t_time = micros();
+  //Serial.println(t_time);
   targetpos();
   checkencoder();
   calculatePID();
   driveMotor();
-  printValues();
+  t_time -= micros();
+  Serial.println(t_time);
+  //printValues();
 }
 
 void driveMotor() {
@@ -88,7 +95,6 @@ void driveMotor() {
 void calculatePID() {
   currentTime = micros();
   deltaTime = (currentTime - previousTime) / 1000000.0;
-  Serial.println(deltaTime);
   previousTime = currentTime;
 
   errorValue = motorPosition - targetPosition;
@@ -142,7 +148,7 @@ void checkencoder() {
 
 int GetPWM(int pin)
 {
-  unsigned long highTime = pulseIn(pin, HIGH);
+  unsigned long highTime = pulseIn(pin, HIGH,20);
 
   if (highTime == 0)
     return digitalRead(pin); 

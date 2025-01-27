@@ -7,6 +7,11 @@
 #define servoPin 5
 #define PWMInput 7
 
+//timer
+
+hw_timer_t *timer = NULL;
+bool timer_flag = false;
+
 // Variables globales
 Servo myservo;
 HardwareSerial MySerial(1);
@@ -14,21 +19,21 @@ bool init_state = false;
 long motorPosition = 0;
 
 // PID
-volatile float targetPosition = 0;
+volatile long targetPosition = 0;
 float integral = 0.0005;
-float proportional = 2.5;
+float proportional = 0.0002;
 float derivative = 0.0005;
 double controlSignal = 0;
 double previousTime = 0;
 double previousError = 0;
 double errorIntegral = 0;
 double currentTime = 0;
-double deltaTime = 0;
-double errorValue = 0;
+const double deltaTime = 0.01;
+long errorValue = 0;
 double edot = 0;
 
 // PWM
-int PWMValue = 0;
+double PWMValue = 0;
 int motorDirection = 0;
 
 //filter
@@ -37,6 +42,12 @@ const int win_size = 10;
 volatile float readings[win_size] = {0}; 
 volatile float sum = 0; 
 volatile int indexx = 0;
+
+
+double u_max = 1;  
+double u_min = -1; 
+
+
 
 void setup() {
   Serial.begin(115200);
@@ -50,12 +61,17 @@ void setup() {
 
   targetPosition = GetPWM(PWMInput);
 
+  Timer_Init();
+
 }
 
 void loop() {
+  if (timer_flag){
+    checkencoder();
+    calculatePID();
+    timer_flag = false;
+  }
   targetpos();
-  checkencoder();
-  calculatePID();
   driveMotor();
   printValues();
 }
@@ -64,34 +80,30 @@ void driveMotor() {
   // Determinar dirección
   motorDirection = (controlSignal < 0) ? -1 : (controlSignal > 0) ? 1 : 0;
 
-  // Calcular PWM
-  PWMValue = (int)fabs(controlSignal);
-  PWMValue = constrain(PWMValue, 0, 255); //checar, tengo duda
-  PWMValue = map(PWMValue, 0, 255, 0, 90);
+  PWMValue = (double)fabs(controlSignal);
+  PWMValue = map(PWMValue, 0, 1, 0, 90);
 
   if (PWMValue <= 5 && errorValue != 0) {
     PWMValue = 5;
   }
 
   if (motorDirection == -1) {
-    myservo.writeMicroseconds(1490 - PWMValue);
+    myservo.writeMicroseconds(1490 - (int)PWMValue);
   } else if (motorDirection == 1) {
-    myservo.writeMicroseconds(1501 + PWMValue);
+    myservo.writeMicroseconds(1501 + (int)PWMValue);
   } else {
     myservo.writeMicroseconds(1500);
   }
 }
 
 void calculatePID() {
-  currentTime = micros();
-  deltaTime = (currentTime - previousTime) / 1000000.0;
-  Serial.println(deltaTime);
-  previousTime = currentTime;
 
   errorValue = motorPosition - targetPosition;
   edot = (errorValue - previousError) / deltaTime;
-  errorIntegral += errorValue * deltaTime;
+  errorIntegral += (errorValue + previousError ) * deltaTime / 2;
   controlSignal = (proportional * errorValue) + (derivative * edot) + (integral * errorIntegral);
+
+  controlSignal = saturation(controlSignal);
 
   previousError = errorValue;
 }
@@ -101,6 +113,8 @@ void printValues() {
   Serial.println(motorPosition);
   Serial.print("Error: ");
   Serial.println(errorValue);
+  Serial.print("PWM: ");
+  Serial.println(controlSignal);
   Serial.print("PWM: ");
   Serial.println(PWMValue);
 }
@@ -124,22 +138,41 @@ void targetpos() {
 
 void checkencoder() {
   int rawReading = GetPWM(PWMInput);
-
   sum = sum - readings[indexx];
   readings[indexx] = rawReading;
   sum = sum + rawReading;
   indexx = (indexx + 1) % win_size;
-
   motorPosition = sum / win_size;
 }
 
 
 int GetPWM(int pin)
 {
-  unsigned long highTime = pulseIn(pin, HIGH);
+  unsigned long highTime = pulseIn(pin, HIGH,20);
 
   if (highTime == 0)
     return digitalRead(pin); 
 
   return highTime;
 }
+
+void ARDUINO_ISR_ATTR onTimer() {
+  if(timer_flag == false)
+  {
+    timer_flag = true;
+  }
+  
+}
+
+void Timer_Init(void)
+{
+  timer = timerBegin(1000000);
+  timerAttachInterrupt(timer, &onTimer);
+  timerAlarm(timer, 10000, true, 0);
+}
+ 
+
+double saturation(double u){
+    return min(max(u, u_min), u_max);
+}
+

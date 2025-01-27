@@ -10,6 +10,7 @@
 //timer
 
 hw_timer_t *timer = NULL;
+bool timer_flag = false;
 
 // Variables globales
 Servo myservo;
@@ -19,16 +20,16 @@ volatile long motorPosition = 0;
 
 // PID
 volatile long targetPosition = 0;
-float ki = 0.0005;
-float kp = 0.001;
-float kd = 0.0005;
+float ki = 0.00005;
+float kp = 0.00001;
+float kd = 0.00005;
 volatile double controlSignal = 0;
 double previousTime = 0;
 double error_k_1 = 0;
 double error_k_2 = 0;
 double errorIntegral = 0;
 double currentTime = 0;
-const double deltaTime = 0.02;
+const double deltaTime = 0.01;
 double error_k = 0;
 double edot = 0;
 volatile double prev_controlSignal = 0.0;
@@ -57,16 +58,22 @@ void setup() {
   pinMode(chPinB, INPUT_PULLUP);
   pinMode(PWMInput, INPUT);
 
-  //targetPosition = GetPWM(PWMInput);
+  targetPosition = GetPWM(PWMInput);
 
   Timer_Init();
 
 }
 
 void loop() {
+  if (timer_flag){
+    checkencoder();
+    calculatePID();
+    timer_flag = false;
+    
+  }
   targetpos();
   driveMotor();
-  //printValues();
+  printValues();
 }
 
 void driveMotor() {
@@ -113,6 +120,20 @@ void targetpos() {
   }
 }
 
+void calculatePID() {
+
+  error_k = motorPosition - targetPosition;
+
+  controlSignal = prev_controlSignal + error_k * (kd/deltaTime + kp + ki*deltaTime) - error_k_1 * (2*kd/deltaTime + kp) + error_k_2*ki*deltaTime;
+
+  error_k_2 = error_k_1;
+  error_k_1 = error_k;
+
+  controlSignal = saturation(controlSignal);
+
+  prev_controlSignal = controlSignal;
+}
+
 void checkencoder() {
   int rawReading = GetPWM(PWMInput);
 
@@ -127,7 +148,7 @@ void checkencoder() {
 
 int GetPWM(int pin)
 {
-  unsigned long highTime = pulseIn(pin, HIGH);
+  unsigned long highTime = pulseIn(pin, HIGH, 10);
 
   if (highTime == 0)
     return digitalRead(pin); 
@@ -136,20 +157,11 @@ int GetPWM(int pin)
 }
 
 void ARDUINO_ISR_ATTR onTimer() {
-
-  checkencoder();
-
-  error_k = motorPosition - targetPosition;
-
-  controlSignal = prev_controlSignal + error_k * (kd/deltaTime + kp + ki*deltaTime) - error_k_1 * (2*kd/deltaTime + kp) + error_k_2*ki*deltaTime;
-
-  error_k_2 = error_k_1;
-  error_k_1 = error_k;
-
-  controlSignal = saturation(controlSignal);
-
-  prev_controlSignal = controlSignal;
-
+  if(timer_flag == false)
+  {
+    timer_flag = true;
+  }
+  
 }
 
 void Timer_Init(void)
@@ -163,5 +175,3 @@ void Timer_Init(void)
 double saturation(double u){
     return min(max(u, u_min), u_max);
 }
-
-
