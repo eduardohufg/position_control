@@ -15,14 +15,14 @@ hw_timer_t *timer = NULL;
 Servo myservo;
 HardwareSerial MySerial(1);
 bool init_state = false;
-long motorPosition = 0;
+volatile long motorPosition = 0;
 
 // PID
-volatile float targetPosition = 0;
+volatile long targetPosition = 0;
 float ki = 0.0005;
 float kp = 0.001;
 float kd = 0.0005;
-double controlSignal = 0;
+volatile double controlSignal = 0;
 double previousTime = 0;
 double error_k_1 = 0;
 double error_k_2 = 0;
@@ -31,7 +31,7 @@ double currentTime = 0;
 const double deltaTime = 0.02;
 double error_k = 0;
 double edot = 0;
-double prev_controlSignal = 0.0;
+volatile double prev_controlSignal = 0.0;
 double u_s = 0.0;
 double u_max = 1;  
 double u_min = -1; 
@@ -43,9 +43,9 @@ int motorDirection = 0;
 //filter
 
 const int win_size = 10; 
-float readings[win_size] = {0}; 
-float sum = 0; 
-int indexx = 0;
+volatile float readings[win_size] = {0}; 
+volatile float sum = 0; 
+volatile int indexx = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -57,7 +57,7 @@ void setup() {
   pinMode(chPinB, INPUT_PULLUP);
   pinMode(PWMInput, INPUT);
 
-  targetPosition = GetPWM(PWMInput);
+  //targetPosition = GetPWM(PWMInput);
 
   Timer_Init();
 
@@ -135,18 +135,6 @@ int GetPWM(int pin)
   return highTime;
 }
 
-void Timer_Init(void)
-{
-  timer = timerBegin(1000000);
-  timerAttachInterrupt(timer, &onTimer);
-  timerAlarm(timer, 20000, true, 0);
- 
-}
-
-double saturation(double u){
-    return min(max(u, u_min), u_max);
-}
-
 void ARDUINO_ISR_ATTR onTimer() {
 
   checkencoder();
@@ -163,4 +151,17 @@ void ARDUINO_ISR_ATTR onTimer() {
   prev_controlSignal = controlSignal;
 
 }
+
+void Timer_Init(void)
+{
+  timer = timerBegin(1000000);
+  timerAttachInterrupt(timer, &onTimer);
+  timerAlarm(timer, 10000, true, 0);
+ 
+}
+
+double saturation(double u){
+    return min(max(u, u_min), u_max);
+}
+
 
