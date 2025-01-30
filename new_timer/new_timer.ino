@@ -1,4 +1,3 @@
-#include <ESP32Servo.h>
 #include <HardwareSerial.h>
 
 // Pines
@@ -10,10 +9,22 @@
 //timer
 
 hw_timer_t *timer = NULL;
-bool timer_flag = false;
+volatile bool timer_flag = false;
+
+void IRAM_ATTR onTimer() {
+  if(timer_flag == false)
+  {
+    timer_flag = true;
+  }
+}
+
+//ledc
+const int PWMFreq = 50; 
+const int PWMChannel = 0;
+const int PWMResolution = 14;
+const int MAX_DUTY_CYCLE = (int)(pow(2, PWMResolution) - 1);
 
 // Variables globales
-Servo myservo;
 HardwareSerial MySerial(1);
 bool init_state = false;
 long motorPosition = 0;
@@ -22,7 +33,7 @@ long motorPosition = 0;
 volatile long targetPosition = 0;
 float integral = 0.2;
 float proportional = 0.2;
-float derivative = 0.075;
+float derivative = 0.00075;
 double controlSignal = 0;
 double previousTime = 0;
 double previousError = 0;
@@ -48,10 +59,15 @@ volatile int indexx = 0;
 const int sat_control_signal = 100;
 const int sat_windup = 20;
 
+double t_time = 0;
+double d_time = 0;
+double t_time_1 = 0;
+
 void setup() {
   Serial.begin(115200);
-  myservo.attach(servoPin);
   MySerial.begin(1000000, SERIAL_8N1, 44, 43);
+  ledcSetup(PWMChannel, PWMFreq, PWMResolution);
+  ledcAttachPin(servoPin, PWMChannel);
 
   // Configurar pines
   pinMode(chPinA, INPUT_PULLUP);
@@ -69,6 +85,7 @@ void loop() {
     checkencoder();
     calculatePID();
     timer_flag = false;
+
   }
   targetpos();
   driveMotor();
@@ -77,23 +94,29 @@ void loop() {
 
 void driveMotor() {
   // Determinar dirección
+
   motorDirection = (controlSignal < 0) ? 1 : (controlSignal > 0) ? -1 : 0;
 
   PWMValue = (int)fabs(controlSignal);
-  PWMValue = map(PWMValue, 0, 100, 0, 90);
+  PWMValue = map(PWMValue, 0, 100, 0, 100);
 
 
 
   if (motorDirection == -1) {
-    myservo.writeMicroseconds(1506 - (int)PWMValue);
+    ledcWrite(PWMChannel, (int)calculateWidh(1490 - PWMValue));
   } else if (motorDirection == 1) {
-    myservo.writeMicroseconds(1521 + (int)PWMValue);
+    ledcWrite(PWMChannel, (int)calculateWidh(1511 + PWMValue));
   } else {
-    myservo.writeMicroseconds(1510);
+    ledcWrite(PWMChannel, (int)calculateWidh(1500));
   }
 }
 
 void calculatePID() {
+
+  //t_time = micros();
+  //d_time = (t_time - t_time_1)/1000000;
+  //t_time_1 = t_time;
+  //Serial.println(d_time);
 
   errorValue = motorPosition - targetPosition;
   edot = (errorValue - previousError) / deltaTime;
@@ -157,23 +180,19 @@ int GetPWM(int pin)
   return highTime;
 }
 
-void ARDUINO_ISR_ATTR onTimer() {
-  if(timer_flag == false)
-  {
-    timer_flag = true;
-  }
-  
-}
 
 void Timer_Init(void)
 {
-  timer = timerBegin(1000000);
-  timerAttachInterrupt(timer, &onTimer);
-  timerAlarm(timer, 10000, true, 0);
+  timer = timerBegin(0, 80, true);
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, 10000, true);
+  timerAlarmEnable(timer);
 }
  
-
 double saturation(double u, double u_min, double u_max){
     return min(max(u, u_min), u_max);
 }
 
+long calculateWidh(long time){
+  return time * MAX_DUTY_CYCLE / 20000;
+}

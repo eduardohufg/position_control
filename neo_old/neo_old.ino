@@ -4,7 +4,7 @@
 // Pines
 #define chPinA 2
 #define chPinB 4
-#define servoPin 5
+#define servoPin 8
 #define PWMInput 7
 
 // Variables globales
@@ -14,7 +14,7 @@ bool init_state = false;
 long motorPosition = 0;
 
 // PID
-volatile long targetPosition = 0;
+long targetPosition = 0;
 float integral = 0.005;
 float proportional = 0.0002;
 float derivative = 0.0005;
@@ -34,9 +34,9 @@ int motorDirection = 0;
 //filter
 
 const int win_size = 10; 
-volatile float readings[win_size] = {0}; 
-volatile float sum = 0; 
-volatile int indexx = 0;
+float readings[win_size] = {0}; 
+float sum = 0; 
+int indexx = 0;
 
 
 double u_max = 1;  
@@ -60,16 +60,13 @@ void setup() {
 }
 
 void loop() {
-  t_time = 0;
-  t_time = micros();
-  //Serial.println(t_time);
+
   targetpos();
   checkencoder();
   calculatePID();
   driveMotor();
-  t_time -= micros();
-  Serial.println(t_time);
-  //printValues();
+
+  printValues();
 }
 
 void driveMotor() {
@@ -112,16 +109,16 @@ void printValues() {
   Serial.println(motorPosition);
   Serial.print("Error: ");
   Serial.println(errorValue);
-  Serial.print("PWM: ");
+  Serial.print("controls: ");
   Serial.println(controlSignal);
   Serial.print("PWM: ");
   Serial.println(PWMValue);
 }
 
 void targetpos() {
-  if (MySerial.available() > 0) {
+  if (Serial.available() > 0) {
 
-    String velString = MySerial.readStringUntil('\n');
+    String velString = Serial.readStringUntil('\n');
 
     if(velString == "init_uart"){
       init_state = true;
@@ -148,7 +145,7 @@ void checkencoder() {
 
 int GetPWM(int pin)
 {
-  unsigned long highTime = pulseIn(pin, HIGH,20);
+  unsigned long highTime = pulseIn(pin, HIGH);
 
   if (highTime == 0)
     return digitalRead(pin); 

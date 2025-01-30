@@ -4,7 +4,7 @@
 // Pines
 #define chPinA 2
 #define chPinB 4
-#define servoPin 5
+#define servoPin 8
 #define PWMInput 7
 
 // Variables globales
@@ -15,9 +15,9 @@ long motorPosition = 0;
 
 // PID
 volatile float targetPosition = 0;
-float integral = 0.0005;
-float proportional = 2.5;
-float derivative = 0.0005;
+float integral = 0.00025;
+float proportional = 1.2;
+float derivative = 0.00025;
 double controlSignal = 0;
 double previousTime = 0;
 double previousError = 0;
@@ -62,7 +62,7 @@ void loop() {
 
 void driveMotor() {
   // Determinar dirección
-  motorDirection = (controlSignal < 0) ? -1 : (controlSignal > 0) ? 1 : 0;
+  motorDirection = (controlSignal < 0) ? 1 : (controlSignal > 0) ? -1 : 0;
 
   // Calcular PWM
   PWMValue = (int)fabs(controlSignal);
@@ -106,9 +106,9 @@ void printValues() {
 }
 
 void targetpos() {
-  if (MySerial.available() > 0) {
+  if (Serial.available() > 0) {
 
-    String velString = MySerial.readStringUntil('\n');
+    String velString = Serial.readStringUntil('\n');
 
     if(velString == "init_uart"){
       init_state = true;

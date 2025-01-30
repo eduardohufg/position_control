@@ -46,7 +46,7 @@ volatile int indexx = 0;
 //saturation
 
 const int sat_control_signal = 100;
-const int sat_windup = 20;
+int sat_windup = 20;
 
 void setup() {
   Serial.begin(115200);
@@ -61,7 +61,6 @@ void setup() {
   targetPosition = GetPWM(PWMInput);
 
   Timer_Init();
-
 }
 
 void loop() {
@@ -72,7 +71,7 @@ void loop() {
   }
   targetpos();
   driveMotor();
-  printValues();
+  //printValues();
 }
 
 void driveMotor() {
@@ -82,24 +81,20 @@ void driveMotor() {
   PWMValue = (int)fabs(controlSignal);
   PWMValue = map(PWMValue, 0, 100, 0, 90);
 
-
-
   if (motorDirection == -1) {
-    myservo.writeMicroseconds(1506 - (int)PWMValue);
+    myservo.writeMicroseconds(1489 - (int)PWMValue);
   } else if (motorDirection == 1) {
-    myservo.writeMicroseconds(1521 + (int)PWMValue);
+    myservo.writeMicroseconds(1515 + (int)PWMValue);
   } else {
-    myservo.writeMicroseconds(1510);
+    myservo.writeMicroseconds(1500);
   }
 }
 
 void calculatePID() {
-
   errorValue = motorPosition - targetPosition;
   edot = (errorValue - previousError) / deltaTime;
 
-
-  errorIntegral += (errorValue + previousError ) * deltaTime / 2;
+  errorIntegral += (errorValue + previousError) * deltaTime / 2;
 
   errorIntegral = saturation(errorIntegral, sat_windup * -1, sat_windup);
   controlSignal = (proportional * errorValue) + (derivative * edot) + (integral * errorIntegral);
@@ -122,18 +117,41 @@ void printValues() {
 
 void targetpos() {
   if (Serial.available() > 0) {
+    String inputString = Serial.readStringUntil('\n');
 
-    String velString = Serial.readStringUntil('\n');
-
-    if(velString == "init_uart"){
+    if (inputString == "init_uart") {
       init_state = true;
-    }
-    else if(velString == "close_uart"){
+    } else if (inputString == "close_uart") {
       init_state = false;
+    } else if (init_state) {
+      if (inputString.indexOf(' ') == -1) {
+        targetPosition = inputString.toInt();
+      } else {
+        // Procesar los parámetros del PID
+        float newProportional, newIntegral, newDerivative;
+        int newSatWindup;
+        int numParsed = sscanf(inputString.c_str(), "%f %f %f %d", &newProportional, &newIntegral, &newDerivative, &newSatWindup);
+
+        if (numParsed == 4) {
+          proportional = newProportional;
+          integral = newIntegral;
+          derivative = newDerivative;
+          sat_windup = newSatWindup;
+
+          Serial.println("PID parameters updated:");
+          Serial.print("Proportional: ");
+          Serial.println(proportional);
+          Serial.print("Integral: ");
+          Serial.println(integral);
+          Serial.print("Derivative: ");
+          Serial.println(derivative);
+          Serial.print("Saturation Windup: ");
+          Serial.println(sat_windup);
+        } else {
+          Serial.println("Error: Invalid PID parameters format.");
+        }
+      }
     }
-    else if (init_state){
-    targetPosition = velString.toInt();
-    }   
   }
 }
 
@@ -146,34 +164,27 @@ void checkencoder() {
   motorPosition = sum / win_size;
 }
 
-
-int GetPWM(int pin)
-{
+int GetPWM(int pin) {
   unsigned long highTime = pulseIn(pin, HIGH);
 
   if (highTime == 0)
-    return digitalRead(pin); 
+    return digitalRead(pin);
 
   return highTime;
 }
 
 void ARDUINO_ISR_ATTR onTimer() {
-  if(timer_flag == false)
-  {
+  if (timer_flag == false) {
     timer_flag = true;
   }
-  
 }
 
-void Timer_Init(void)
-{
+void Timer_Init(void) {
   timer = timerBegin(1000000);
   timerAttachInterrupt(timer, &onTimer);
   timerAlarm(timer, 10000, true, 0);
 }
- 
 
-double saturation(double u, double u_min, double u_max){
-    return min(max(u, u_min), u_max);
+double saturation(double u, double u_min, double u_max) {
+  return min(max(u, u_min), u_max);
 }
-
