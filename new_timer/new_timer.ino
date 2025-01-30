@@ -100,8 +100,6 @@ void driveMotor() {
   PWMValue = (int)fabs(controlSignal);
   PWMValue = map(PWMValue, 0, 100, 0, 100);
 
-
-
   if (motorDirection == -1) {
     ledcWrite(PWMChannel, (int)calculateWidh(1490 - PWMValue));
   } else if (motorDirection == 1) {
