@@ -18,6 +18,10 @@ void IRAM_ATTR onTimer() {
   }
 }
 
+
+//commands
+int mode = 10;
+
 //ledc
 const int PWMFreq = 50; 
 const int PWMChannel = 0;
@@ -76,14 +80,20 @@ void setup() {
 }
 
 void loop() {
-  if (timer_flag){
+  if(mode == 0 && init_state){
+
+    if (timer_flag){
     checkencoder();
     calculatePID();
     timer_flag = false;
+    } 
+    input_command();
+    driveMotor();
   }
-  targetpos();
-  driveMotor();
-  printValues();
+  else if(mode == 3 && init_state){
+    input_command();
+  }
+  
 }
 
 void driveMotor() {
@@ -127,20 +137,10 @@ void printValues() {
   Serial.println(PWMValue);
 }
 
-void targetpos() {
+void input_command() {
   if (MySerial.available() > 0) {
-
     String velString = MySerial.readStringUntil('\n');
-
-    if(velString == "init_uart"){
-      init_state = true;
-    }
-    else if(velString == "close_uart"){
-      init_state = false;
-    }
-    else if (init_state){
-    targetPosition = velString.toInt();
-    }   
+    processCommand(velString);
   }
 }
 
@@ -160,6 +160,39 @@ int GetPWM(int pin) {
     return digitalRead(pin);
 
   return highTime;
+}
+
+void processCommand(String command){
+  if (command.startsWith("MODE,")){
+    sscanf(command.c_str(), "MODE,%d", &mode);
+  }
+
+  else if (command.startsWith("SP,")){
+    sscanf(command.c_str(), "SP,%d", &targetPosition);
+  }
+
+  else if(command == "INIT"){
+    init_state = true;
+    if (mode == 0){
+      targetPosition = GetPWM(PWMInput);
+    }
+  }
+
+  else if(command == "STOP"){
+    init_state = false;
+  }
+
+  else if (command.startsWith("PID,")) {
+        sscanf(command.c_str(), "PID,%f,%f,%f", &proportional, &integral, &derivative);
+    }
+
+  else if (command.startsWith("LIMIT,")){
+    sscanf(command.c_str(), "LIMIT,%d", &sat_windup);
+  }
+
+  else if(command == "GET_POS"){
+    MySerial.printf("%d\n",motorPosition);
+  }
 }
 
 
