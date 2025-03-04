@@ -31,15 +31,15 @@ long motorPosition = 0;
 
 // PID
 volatile long targetPosition = 0;
-float integral = 0.2;
-float proportional = 0.2;
-float derivative = 0.075;
+float integral = 0.11;
+float proportional = 0.11;
+float derivative = 0.005;
 double controlSignal = 0;
 double previousTime = 0;
 double previousError = 0;
 double errorIntegral = 0;
 double currentTime = 0;
-const double deltaTime = 0.01;
+const double deltaTime = 0.005;
 long errorValue = 0;
 double edot = 0;
 
@@ -83,7 +83,7 @@ void loop() {
   }
   targetpos();
   driveMotor();
-  //printValues();
+  printValues();
 }
 
 void driveMotor() {
@@ -128,42 +128,19 @@ void printValues() {
 }
 
 void targetpos() {
-  if (Serial.available() > 0) {
-    String inputString = Serial.readStringUntil('\n');
+  if (MySerial.available() > 0) {
 
-    if (inputString == "init_uart") {
+    String velString = MySerial.readStringUntil('\n');
+
+    if(velString == "init_uart"){
       init_state = true;
-    } else if (inputString == "close_uart") {
-      init_state = false;
-    } else if (init_state) {
-      if (inputString.indexOf(' ') == -1) {
-        targetPosition = inputString.toInt();
-      } else {
-        // Procesar los parámetros del PID
-        float newProportional, newIntegral, newDerivative;
-        int newSatWindup;
-        int numParsed = sscanf(inputString.c_str(), "%f %f %f %d", &newProportional, &newIntegral, &newDerivative, &newSatWindup);
-
-        if (numParsed == 4) {
-          proportional = newProportional;
-          integral = newIntegral;
-          derivative = newDerivative;
-          sat_windup = newSatWindup;
-
-          Serial.println("PID parameters updated:");
-          Serial.print("Proportional: ");
-          Serial.println(proportional);
-          Serial.print("Integral: ");
-          Serial.println(integral);
-          Serial.print("Derivative: ");
-          Serial.println(derivative);
-          Serial.print("Saturation Windup: ");
-          Serial.println(sat_windup);
-        } else {
-          Serial.println("Error: Invalid PID parameters format.");
-        }
-      }
     }
+    else if(velString == "close_uart"){
+      init_state = false;
+    }
+    else if (init_state){
+    targetPosition = velString.toInt();
+    }   
   }
 }
 
@@ -190,7 +167,7 @@ void Timer_Init(void)
 {
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 10000, true);
+  timerAlarmWrite(timer, 5000, true);
   timerAlarmEnable(timer);
 }
  
